@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreadVerse - Energy-Aware Simulator</title>
+
+<style>
+body {
+    margin:0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background:#050508;
+    color:#eee;
+    overflow-x: hidden;
+}
+
+/* NAVBAR */
+.navbar{
+    position:fixed;
+    top:0;
+    width:100%;
+    padding:12px 30px;
+    background:#0a0a0f;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    z-index:1000;
+    box-sizing: border-box;
+    border-bottom: 1px solid #1a1a22;
+}
+
+.nav-left img{ height:40px; }
+
+.nav-center{
+    position:absolute;
+    left:50%;
+    transform:translateX(-50%);
+    font-weight:bold;
+    color:#7c3aed;
+    letter-spacing: 2px;
+}
+
+.nav-right { display: flex; align-items: center; gap: 15px; }
+.energy-meter { color: #00ff9c; font-family: monospace; font-size: 13px; border: 1px solid #00ff9c33; padding: 4px 8px; border-radius: 4px; }
+
+.nav-right button{
+    padding:8px 14px;
+    background:#7c3aed;
+    border:none;
+    color:#fff;
+    cursor:pointer;
+    border-radius: 4px;
+}
+
+/* CONTROLS */
+.controls-container {
+    position: fixed;
+    top: 65px;
+    width: 100%;
+    background: #0d0d14;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-bottom: 1px solid #222;
+    z-index: 999;
+}
+
+.controls {
+    padding: 10px 30px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.legend {
+    display: flex;
+    gap: 20px;
+    padding-bottom: 10px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888;
+}
+
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+
+.controls button {
+    padding: 8px 16px;
+    background: #1a1a24;
+    border: 1px solid #333;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-size: 13px;
+}
+
+.controls button:hover { background: #7c3aed; border-color: #9061f9; }
+
+/* PAGE */
+.container{ padding: 190px 30px 30px 30px; }
+.grid{ display:grid; grid-template-columns: 320px 1fr; gap:25px; }
+
+/* THREAD CARDS */
+.thread{
+    background:#111118;
+    padding:15px;
+    margin-bottom:12px;
+    border-radius:8px;
+    border:1px solid #222;
+    position:relative;
+}
+
+.running{ border-left:6px solid #00ff9c; }
+.waiting{ border-left:6px solid #f59e0b; }
+.idle_state{ border-left:6px solid #ff3e3e; }
+
+.p-data {
+    font-size: 10px;
+    color: #666;
+    margin-top: 5px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    font-family: monospace;
+}
+
+.progress{ height:6px; background:#222; margin-top:10px; border-radius:10px; overflow:hidden; }
+.bar{ height:100%; transition: width 0.3s ease; }
+
+.remove-btn{
+    position:absolute;
+    top:8px; right:8px; width:22px; height:22px;
+    border-radius:50%; border:none; background:#222;
+    color:#ff4d4d; cursor:pointer; display:flex;
+    align-items:center; justify-content:center;
+}
+
+/* GRAPHS */
+.graphs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(400px,1fr)); gap:20px; }
+.graph-card{ background:#0a0a0f; border:1px solid #222; padding:20px; border-radius:10px; position:relative; }
+canvas{ width:100%; height:260px; display:block; }
+.graph-status-label {
+    position:absolute; top:15px; right:20px; font-size:10px; font-weight:bold;
+    padding:2px 8px; border-radius:4px; background:rgba(0,0,0,0.6);
+}
+.thread-label{ text-align:center; margin-top:15px; font-size:12px; color:#888; font-weight:bold; }
+
+.light{ background:#f4f4f5; color:#111; }
+.light .navbar, .light .controls-container { background:#fff; border-color:#ddd; }
+.light .thread, .light .graph-card { background:#fff; border-color:#ddd; color:#111; }
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+    <div class="nav-left"><img src="LOGO.PNG" alt="Logo"></div>
+    <div class="nav-center">THREAD-VERSE</div>
+    <div class="nav-right">
+        <div class="energy-meter">⚡ <span id="power-val">0.00</span> W</div>
+        <button onclick="toggleTheme()">Theme</button>
+    </div>
+</div>
+
+<div class="controls-container">
+    <div class="controls">
+        <button onclick="sys.start()">▶ Start Energy-Aware</button>
+        <button onclick="sys.stop()">⏹ Stop</button>
+        <button onclick="sys.reset()">🔄 Reset</button>
+        <button onclick="sys.createThreads(2)">+ Add Threads</button>
+        <button onclick="sys.manualAdd()">+ Manual Entry</button>
+        <button onclick="sys.heavyLoad()">🔥 Max Performance</button>
+        <button onclick="sys.setIdle()">😴 Deep Sleep</button>
+    </div>
+    <div class="legend">
+        <div class="legend-item"><div class="dot" style="background:#00ff9c;"></div> RUNNING</div>
+        <div class="legend-item"><div class="dot" style="background:#f59e0b;"></div> WAITING</div>
+        <div class="legend-item"><div class="dot" style="background:#ff3e3e;"></div> IDLE CONDITION</div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="grid">
+        <div id="threads"></div>
+        <div class="graphs" id="graphs"></div>
+    </div>
+</div>
+
+<script>
+class ThreadSystem {
+    constructor(){
+        this.threads = [];
+        this.history = {}; 
+        this.isRunning = true; 
+        this.manualMode = true; 
+        this.cpuFreq = 1.0; 
+        this.baseVoltage = 0.8; 
+        this.totalPower = 0;
+        this.loop();
+    }
+
+    start(){ this.isRunning = true; this.manualMode = false; }
+    stop(){ this.isRunning = false; }
+    reset(){
+        this.stop();
+        this.threads = [];
+        this.history = {};
+        this.manualMode = true;
+        this.cpuFreq = 1.0;
+        document.getElementById("threads").innerHTML = "";
+        document.getElementById("graphs").innerHTML = "";
+        this.createThreads(2); 
+        this.isRunning = true;
+    }
+
+    manualAdd() {
+        const prio = prompt("Enter Priority (1-High, 5-Low):", "3");
+        const burst = prompt("Enter Burst Time (Seconds):", "10");
+        this.addThread(prio, burst);
+    }
+
+    createThreads(n){
+        for(let i=0;i<n;i++){
+            this.addThread(Math.floor(Math.random()*5)+1, Math.floor(Math.random()*10)+5);
+        }
+    }
+
+    addThread(prio, burst) {
+        const internalId = Date.now() + Math.random();
+        this.threads.push({
+            id: internalId,
+            priority: parseInt(prio) || 3,
+            burst: parseInt(burst) || 10,
+            progress: 0,
+            state: "idle_state"
+        });
+        this.history[internalId] = new Array(60).fill(0);
+        this.updateGraphContainer(); 
+    }
+
+    removeThread(id){
+        this.threads = this.threads.filter(t => t.id !== id);
+        delete this.history[id];
+        this.updateGraphContainer(); 
+    }
+
+    heavyLoad(){ 
+        this.manualMode = true;
+        this.isRunning = true;
+        this.cpuFreq = 4.0; 
+        this.threads.forEach(t => t.state = "running"); 
+    }
+
+    setIdle(){ 
+        this.manualMode = true;
+        this.isRunning = true;
+        this.cpuFreq = 0.4; 
+        this.threads.forEach(t => t.state = "idle_state"); 
+    }
+
+    updateGraphContainer() {
+        const container = document.getElementById("graphs");
+        container.innerHTML = "";
+        this.threads.forEach((t, index) => {
+            const card = document.createElement("div");
+            card.className = "graph-card";
+            card.innerHTML = `
+                <div id="stat-${t.id}" class="graph-status-label">IDLE CONDITION</div>
+                <canvas id="c-${t.id}"></canvas>
+                <div class="thread-label">Thread ID: ${101 + index}</div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    scheduler(){
+        if(this.manualMode) return;
+        let activeThreads = 0;
+        const sortedThreads = [...this.threads].sort((a,b) => a.priority - b.priority);
+        sortedThreads.forEach((t, index) => {
+            if(index < 2) { t.state = "running"; activeThreads++; }
+            else if (index < 4) { t.state = "waiting"; }
+            else { t.state = "idle_state"; }
+        });
+        let targetFreq = 0.8 + (activeThreads * 0.6);
+        this.cpuFreq += (targetFreq - this.cpuFreq) * 0.05; 
+    }
+
+    calculatePower(){
+        let voltage = this.baseVoltage + (this.cpuFreq * 0.1);
+        let activeCount = this.threads.filter(t => t.state === "running").length;
+        this.totalPower = (voltage * voltage) * this.cpuFreq * (activeCount + 0.5);
+        document.getElementById("power-val").innerText = this.totalPower.toFixed(2);
+    }
+
+    update(){
+        if(!this.isRunning) return;
+        this.scheduler();
+        this.calculatePower();
+        this.threads.forEach(t => {
+            let currentLoad = (t.state === "running") ? 70 + (Math.random() * 20) : 
+                              (t.state === "waiting") ? 10 + (Math.random() * 10) : Math.random() * 2;
+            if(t.state === "running") t.progress += (this.cpuFreq * 0.4);
+            else if (t.state === "waiting") t.progress += 0.05;
+            this.history[t.id].push(currentLoad);
+            if(this.history[t.id].length > 60) this.history[t.id].shift();
+            if(t.progress >= 100) t.progress = 0;
+        });
+        this.renderThreads();
+        this.drawGraphs();
+    }
+
+    renderThreads(){
+        const container = document.getElementById("threads");
+        container.innerHTML = "";
+        this.threads.forEach((t, index) => {
+            const dispId = 101 + index;
+            const div = document.createElement("div");
+            div.className = `thread ${t.state}`;
+            const color = this.getColor(t.state);
+            div.innerHTML = `
+                <button class="remove-btn" onclick="sys.removeThread(${t.id})">×</button>
+                <strong>Thread ${dispId}</strong>
+                <div class="p-data">
+                    <span>TID: ${dispId}</span> <span>Prio: ${t.priority}</span>
+                    <span>Freq: ${this.cpuFreq.toFixed(1)} GHz</span> <span>Power: ${(this.totalPower/(this.threads.length||1)).toFixed(2)}W</span>
+                </div>
+                <div class="progress"><div class="bar" style="width:${t.progress}%; background:${color}"></div></div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    getColor(state){ return state === "running" ? "#00ff9c" : state === "waiting" ? "#f59e0b" : "#ff3e3e"; }
+
+    drawGraphs(){
+        this.threads.forEach((t) => {
+            const canvas = document.getElementById(`c-${t.id}`);
+            if(!canvas) return;
+            const ctx = canvas.getContext("2d");
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const w = rect.width; const h = rect.height;
+            const color = this.getColor(t.state);
+            const pL = 55, pB = 50, pT = 20, pR = 25;
+
+            const label = document.getElementById(`stat-${t.id}`);
+            if(label) { label.innerText = t.state === "idle_state" ? "IDLE CONDITION" : t.state.toUpperCase(); label.style.color = color; }
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Restoring X-Axis Labels (Time Sequence)
+            ctx.font = "9px monospace"; ctx.fillStyle = "#777"; ctx.textAlign = "center";
+            for(let i=0; i<=5; i++){
+                let x = pL + (i/5)*(w - pL - pR);
+                ctx.fillText(i * 20 + "ms", x, h - pB + 18);
+            }
+            ctx.fillText("TIME SEQUENCE", w/2 + 15, h - 10);
+
+            // Restoring Y-Axis Labels (Load %)
+            ctx.textAlign = "right";
+            [100, 75, 50, 25, 0].forEach(v => {
+                let y = pT + (1 - v/100)*(h - pB - pT);
+                ctx.fillText(v + "%", pL - 10, y + 3);
+            });
+
+            // Y-Axis Vertical Text
+            ctx.save(); ctx.translate(15, h/2 - 15); ctx.rotate(-Math.PI/2);
+            ctx.fillText("LOAD (%)", 0, 0); ctx.restore();
+
+            // Grid Lines
+            ctx.strokeStyle = "#1a1a22"; ctx.lineWidth = 1; ctx.beginPath();
+            for(let i=0; i<=4; i++){ let y = pT + (i/4)*(h - pB - pT); ctx.moveTo(pL, y); ctx.lineTo(w - pR, y); }
+            for(let i=0; i<=5; i++){ let x = pL + (i/5)*(w - pL - pR); ctx.moveTo(x, pT); ctx.lineTo(x, h - pB); }
+            ctx.stroke();
+
+            // Line Graph Logic
+            const data = this.history[t.id];
+            if(data){
+                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = "round";
+                data.forEach((val, i) => {
+                    let x = pL + (i/(data.length-1))*(w-pL-pR);
+                    let y = (h - pB) - (val/100)*(h-pB-pT);
+                    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                // Gradient Fill
+                ctx.lineTo(w-pR, h-pB); ctx.lineTo(pL, h-pB);
+                const grad = ctx.createLinearGradient(0, pT, 0, h-pB);
+                grad.addColorStop(0, color + "33"); grad.addColorStop(1, color + "00");
+                ctx.fillStyle = grad; ctx.fill();
+            }
+
+            // Restore Main Axes Lines
+            ctx.strokeStyle = "#444"; ctx.lineWidth = 1.5; ctx.beginPath();
+            ctx.moveTo(pL, pT); ctx.lineTo(pL, h - pB); ctx.lineTo(w - pR, h - pB); ctx.stroke();
+        });
+    }
+
+    loop(){ this.update(); requestAnimationFrame(() => this.loop()); }
+}
+
+function toggleTheme(){ document.body.classList.toggle("light"); }
+const sys = new ThreadSystem();
+sys.createThreads(2);
+</script>
+
+</body>
+</html>
